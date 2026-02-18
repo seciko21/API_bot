@@ -1,0 +1,36 @@
+# Variables de entorno sensibles
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Docker
+*.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OpenClaw repo (external code)
+openclaw_repo/
+
+# Database
+*.db
+*.sqlite

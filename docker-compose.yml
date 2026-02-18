@@ -1,0 +1,39 @@
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram-security-bot
+    restart: on-failure
+    env_file:
+      - .env
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - OPENCLAW_URL=http://openclaw:18789
+      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
+    depends_on:
+      - openclaw
+    networks:
+      - bot-network
+
+  openclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
+    image: openclaw:local
+    container_name: openclaw-gateway
+    restart: on-failure
+    ports:
+      - "18789:18789"
+    environment:
+      - OPENCLAW_PORT=18789
+      - OPENCLAW_VERBOSE=true
+      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
+    env_file:
+      - .env
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
