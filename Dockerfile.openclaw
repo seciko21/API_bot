@@ -53,5 +53,6 @@ USER node
 # Por defecto se vincula a loopback (127.0.0.1) por seguridad
 # Para acceso externo: establecer OPENCLAW_GATEWAY_TOKEN o usar --bind lan
 ENV OPENCLAW_PORT=18789
+ENV OPENCLAW_GATEWAY_BIND=loopback
 
-CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan"]
+CMD node openclaw.mjs gateway --allow-unconfigured --bind ${OPENCLAW_GATEWAY_BIND}

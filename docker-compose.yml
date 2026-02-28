@@ -1,22 +1,16 @@
 services:
-  telegram-bot:
-    build: .
-    container_name: telegram-security-bot
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-ai
     restart: on-failure
-    env_file:
-      - .env
-    environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      - OPENCLAW_URL=http://openclaw:18789
-      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
-    depends_on:
-      - openclaw
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
     networks:
       - bot-network
 
-  openclaw:
+  openclaw-gateway:
     build:
       context: .
       dockerfile: Dockerfile.openclaw
@@ -29,11 +23,37 @@ services:
       - OPENCLAW_PORT=18789
       - OPENCLAW_VERBOSE=true
       - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
+      - OLLAMA_API_KEY=ollama-local
+      - OLLAMA_HOST=http://ollama:11434
+      - OPENCLAW_GATEWAY_BIND=loopback
     env_file:
       - .env
+    depends_on:
+      - ollama
+    networks:
+      - bot-network
+
+  telegram-bot:
+    build: .
+    container_name: telegram-security-bot
+    restart: on-failure
+    env_file:
+      - .env
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OPENCLAW_URL=http://openclaw-gateway:18789
+      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
+    depends_on:
+      - ollama
+      - openclaw-gateway
     networks:
       - bot-network
 
 networks:
   bot-network:
     driver: bridge
+
+volumes:
+  ollama_data:
