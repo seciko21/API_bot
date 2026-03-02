@@ -9,6 +9,15 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - bot-network
+    # GPU support - requires NVIDIA GPU and nvidia-docker
+    # Remove if running on CPU only
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
@@ -28,7 +37,7 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
     depends_on:
       ollama:
         condition: service_healthy
