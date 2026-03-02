@@ -16,10 +16,9 @@ OLLAMA_OPTIONS = {
     "temperature": 0.6,      # Menor temperatura = más determinista, más rápido
     "top_p": 0.85,          # Limita sampling
     "top_k": 40,            # Limita vocabulario
-    "num_ctx": 2048,        # Contexto reducido
-    "num_predict": 512,     # Límite de tokens de respuesta (reducido de 2048)
+    "num_ctx": 2048,        # Contexto reducido (máx 4096)
+    "num_predict": 256,     # Límite de tokens de respuesta (reducido)
     "repeat_penalty": 1.1,  # Evita repeticiones
-    "seed": 42              # Determinismo
 }
 
 # Contexto de seguridad residencial para el agente
