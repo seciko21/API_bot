@@ -8,7 +8,7 @@ from collections import defaultdict
 from telegram import Update, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, ConversationHandler
 import requests
-from openclaw_client import send_via_openclaw, query_agent, is_openclaw_available, process_message_through_openclaw
+from ollama_client import chat_with_ollama, query_ollama, is_ollama_available, get_ollama_status, process_message_with_ollama
 
 # Configuración de Telegram
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
@@ -1016,7 +1016,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_name = update.effective_user.first_name
         
         # Mensaje de bienvenida con estilo Gemini Dark
-        openclaw_status = "🟢 Disponible" if is_openclaw_available() else "🔴 No disponible"
+        openclaw_status = "🟢 Disponible" if is_ollama_available() else "🔴 No disponible"
         ai_status = "🟢 Activa" if OLLAMA_HOST else "⚪ No configurada"
         
         welcome_text = (
@@ -1195,7 +1195,7 @@ async def handle_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_openclaw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Maneja el comando /openclaw - Muestra el estado de OpenClaw"""
-    available = is_openclaw_available()
+    available = is_ollama_available()
     
     if available:
         oc_status = (
@@ -1580,8 +1580,8 @@ Basándote en esta información, proporciona una respuesta clara y útil al usua
         elif intent == "mantenimiento" or "mantenimiento" in query:
             response = search_security_info(user_message, use_web=True, category="general")
         
-        # ----- CONSULTAS OPENCLAW (SI ESTÁ DISPONIBLE) -----
-        elif is_openclaw_available():
+        # ----- CONSULTAS OLLAMA (SI ESTÁ DISPONIBLE) -----
+        elif is_ollama_available():
             await update.message.reply_text("🤖 Procesando con IA...", parse_mode='Markdown')
             
             # Construir contexto mejorado
@@ -1592,7 +1592,7 @@ Basándote en esta información, proporciona una respuesta clara y útil al usua
                 f"Último tema: {user_memory.get_preferences(user_id).get('ultimo_tema', 'N/A')}"
             )
             
-            response = process_message_through_openclaw(user_id, user_message, context_info)
+            response = process_message_with_ollama(user_id, user_message, context_info)
             
             if not response:
                 response = get_default_response_smart(user_name)
@@ -1938,7 +1938,7 @@ def get_help_content() -> str:
 
 def get_system_status() -> str:
     """Estado del sistema de seguridad"""
-    openclaw_status = "🟢 Activo" if is_openclaw_available() else "🔴 Inactivo"
+    openclaw_status = "🟢 Activo" if is_ollama_available() else "🔴 Inactivo"
     ai_status = "🟢 Disponible" if DEEPSEEK_API_KEY else "⚪ No configurado"
     
     return (

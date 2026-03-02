@@ -9,29 +9,14 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - bot-network
-
-  openclaw-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile.openclaw
-    image: openclaw:local
-    container_name: openclaw-gateway
-    restart: on-failure
-    ports:
-      - "18789:18789"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     environment:
-      - OPENCLAW_PORT=18789
-      - OPENCLAW_VERBOSE=true
-      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
-      - OLLAMA_API_KEY=ollama-local
-      - OLLAMA_HOST=http://ollama:11434
-      - OPENCLAW_GATEWAY_BIND=loopback
-    env_file:
-      - .env
-    depends_on:
-      - ollama
-    networks:
-      - bot-network
+      - OLLAMA_MODELS=/root/.ollama/models
 
   telegram-bot:
     build: .
@@ -43,11 +28,9 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
-      - OPENCLAW_URL=http://openclaw-gateway:18789
-      - OPENCLAW_GATEWAY_TOKEN=83fb8d8074f3ea57fd1cf3ac8300013af3404d43da42a9f865ca3e0126d5c824
     depends_on:
-      - ollama
-      - openclaw-gateway
+      ollama:
+        condition: service_healthy
     networks:
       - bot-network
 
