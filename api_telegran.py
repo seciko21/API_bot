@@ -8,7 +8,7 @@ from collections import defaultdict
 from telegram import Update, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, ConversationHandler
 import requests
-from ollama_client import chat_with_ollama, query_ollama, is_ollama_available, get_ollama_status, process_message_with_ollama
+from ollama_client import chat_with_ollama, query_ollama, is_ollama_available, get_ollama_status, process_message_with_ollama, chat_with_ollama_streaming, OLLAMA_OPTIONS
 
 # Configuración de Telegram
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
@@ -1582,19 +1582,41 @@ Basándote en esta información, proporciona una respuesta clara y útil al usua
         
         # ----- CONSULTAS OLLAMA (SI ESTÁ DISPONIBLE) -----
         elif is_ollama_available():
-            await update.message.reply_text("🤖 Procesando con IA...", parse_mode='Markdown')
-            
-            # Construir contexto mejorado
-            context_info = (
-                f"Usuario: {user_name}\n"
-                f"ID: {user_id}\n"
-                f"Historial: {conversation_summary}\n"
-                f"Último tema: {user_memory.get_preferences(user_id).get('ultimo_tema', 'N/A')}"
-            )
-            
-            response = process_message_with_ollama(user_id, user_message, context_info)
-            
-            if not response:
+            # Usar streaming para respuestas más fluidas
+            try:
+                # Construir mensajes para el chat
+                from ollama_client import SECURITY_CONTEXT
+                messages = [
+                    {"role": "system", "content": SECURITY_CONTEXT}
+                ]
+                
+                if context_info:
+                    messages.append({"role": "system", "content": f"Contexto adicional: {context_info}"})
+                
+                messages.append({"role": "user", "content": user_message})
+                
+                # Enviar mensaje inicial
+                msg = await update.message.reply_text("🤖 Generando respuesta...", parse_mode='Markdown')
+                
+                # Acumular respuesta
+                full_response = []
+                
+                def callback(chunk: str):
+                    full_response.append(chunk)
+                
+                # Ejecutar streaming
+                success = chat_with_ollama_streaming(messages, callback, timeout=60)
+                
+                if success and full_response:
+                    response = "".join(full_response)
+                    # Enviar respuesta completa
+                    await msg.edit_text(response[:4096], parse_mode='Markdown')
+                else:
+                    response = get_default_response_smart(user_name)
+                    await msg.edit_text(response)
+                    
+            except Exception as e:
+                logger.error(f"Error en streaming: {e}")
                 response = get_default_response_smart(user_name)
         
         # ----- RESPUESTA POR DEFECTO -----

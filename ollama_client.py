@@ -2,13 +2,25 @@ import requests
 import json
 import logging
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
+from threading import Thread
 
 logger = logging.getLogger(__name__)
 
 # Configuración de Ollama desde variables de entorno
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
+
+# Configuración optimizada para menor latencia
+OLLAMA_OPTIONS = {
+    "temperature": 0.6,      # Menor temperatura = más determinista, más rápido
+    "top_p": 0.85,          # Limita sampling
+    "top_k": 40,            # Limita vocabulario
+    "num_ctx": 2048,        # Contexto reducido
+    "num_predict": 512,     # Límite de tokens de respuesta (reducido de 2048)
+    "repeat_penalty": 1.1,  # Evita repeticiones
+    "seed": 42              # Determinismo
+}
 
 # Contexto de seguridad residencial para el agente
 SECURITY_CONTEXT = """
@@ -84,14 +96,14 @@ Responde de manera clara, útil y concisa. Si no sabes algo, admítelo honestame
 """
 
 
-def query_ollama(prompt: str, system_context: str = None, timeout: int = 120) -> Optional[str]:
+def query_ollama(prompt: str, system_context: str = None, timeout: int = 60) -> Optional[str]:
     """
     Envía una consulta a Ollama y retorna la respuesta.
     
     Args:
         prompt: La pregunta o mensaje del usuario
         system_context: Contexto adicional del sistema (opcional)
-        timeout: Timeout en segundos
+        timeout: Timeout en segundos (reducido a 60s por defecto)
         
     Returns:
         La respuesta del modelo o None si hay error
@@ -108,11 +120,7 @@ def query_ollama(prompt: str, system_context: str = None, timeout: int = 120) ->
             "model": OLLAMA_MODEL,
             "prompt": full_prompt,
             "stream": False,
-            "options": {
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "max_tokens": 2048
-            }
+            "options": OLLAMA_OPTIONS
         }
         
         response = requests.post(
@@ -140,9 +148,59 @@ def query_ollama(prompt: str, system_context: str = None, timeout: int = 120) ->
         return None
 
 
-def chat_with_ollama(messages: list, timeout: int = 120) -> Optional[str]:
+def chat_with_ollama_streaming(messages: list, callback: Callable[[str], None], timeout: int = 60) -> bool:
+    """
+    Chat conversacional con streaming - envía fragmentos al callback.
+    
+    Args:
+        messages: Lista de mensajes [{"role": "user/assistant/system", "content": "..."}]
+        callback: Función que recibe cada fragmento de respuesta
+        timeout: Timeout en segundos
+        
+    Returns:
+        True si fue exitoso, False si hay error
+    """
+    try:
+        url = f"{OLLAMA_HOST}/api/chat"
+        
+        payload = {
+            "model": OLLAMA_MODEL,
+            "messages": messages,
+            "stream": True,
+            "options": OLLAMA_OPTIONS
+        }
+        
+        response = requests.post(
+            url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            stream=True,
+            timeout=timeout
+        )
+        
+        if response.status_code == 200:
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    data = json.loads(line)
+                    if "message" in data and "content" in data["message"]:
+                        chunk = data["message"]["content"]
+                        full_response += chunk
+                        callback(chunk)
+            return True
+        else:
+            logger.error(f"Error de Ollama: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error en chat streaming con Ollama: {e}")
+        return False
+
+
+def chat_with_ollama(messages: list, timeout: int = 60) -> Optional[str]:
     """
     Chat conversacional con Ollama usando el formato de mensajes.
+    Optimizado para menor latencia.
     
     Args:
         messages: Lista de mensajes [{"role": "user/assistant/system", "content": "..."}]
@@ -158,10 +216,7 @@ def chat_with_ollama(messages: list, timeout: int = 120) -> Optional[str]:
             "model": OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
-            "options": {
-                "temperature": 0.7,
-                "top_p": 0.9
-            }
+            "options": OLLAMA_OPTIONS
         }
         
         response = requests.post(
